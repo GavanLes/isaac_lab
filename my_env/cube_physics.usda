@@ -1,0 +1,43 @@
+#usda 1.0
+(
+    defaultPrim = "Cube"
+)
+
+def Cube "Cube" (
+    prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysxRigidBodyAPI", "PhysicsCollisionAPI", "PhysicsMassAPI", "PhysicsMaterialAPI"]
+)
+{
+    double size = 0.04
+    float3[] extent = [(-0.02, -0.02, -0.04), (0.02, 0.02, 0.04)]
+    color3f[] primvars:displayColor = [(0.0, 0.8, 0.0)]
+    float3 xformOp:scale = (1, 1, 2)
+    uniform token[] xformOpOrder = ["xformOp:scale"]
+
+    uniform bool physics:rigidBodyEnabled = true
+    uniform bool physics:kinematicEnabled = false
+    uniform float physics:mass = 0.05
+
+    def Scope "Looks"
+    {
+        def Material "GreenMaterial" (
+            prepend apiSchemas = ["PhysicsMaterialAPI"]
+        )
+        {
+            token outputs:surface.connect = </Cube/Looks/GreenMaterial/PreviewSurface.outputs:surface>
+
+            def Shader "PreviewSurface"
+            {
+                uniform token info:id = "UsdPreviewSurface"
+                color3f inputs:diffuseColor = (0.0, 0.8, 0.0)
+                float inputs:roughness = 0.45
+                float inputs:metallic = 0.0
+                token outputs:surface
+            }
+
+            uniform float physics:dynamicFriction = 20
+            uniform float physics:restitution = 0
+            uniform float physics:staticFriction = 20
+            uniform token physxMaterial:frictionCombineMode = "max"
+        }
+    }
+}

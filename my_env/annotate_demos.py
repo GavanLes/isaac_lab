@@ -33,14 +33,28 @@ parser.add_argument(
     "--output", type=str, default="./datasets/cube_tray_annotated.hdf5",
     help="Output annotated HDF5.",
 )
+parser.add_argument(
+    "--manual", type=str, default=None,
+    help="Path to a JSON file with manual subtask transition frames. "
+         "Format: {\"demo_1\": {\"grasp\": 168, \"place\": 350}, ...}. "
+         "When provided, auto-detected signals are replaced with these exact frames.",
+)
 args_cli = parser.parse_args()
 
+import json
 import h5py
 import numpy as np
 import torch
 
 # Tray fixed position (must match scene_config.TRAY_CENTER and MimicEnv cfg)
 _TRAY_POS = torch.tensor([-1.71578, -0.0800, 0.1797], dtype=torch.float32)
+
+# Number of initial settling steps to trim from each episode.
+# The first few steps after reset contain large orientation transients
+# (e.g. 14.5° jumps) as the robot settles into its rest pose. Keeping
+# them causes MimicGen waypoint trajectories to include unnecessary
+# nodding motions.
+_TRIM_FRONT = 5
 
 
 def pos_quat_to_matrix(pos: torch.Tensor, quat_wxyz: torch.Tensor) -> torch.Tensor:
@@ -72,6 +86,15 @@ def main():
     src = h5py.File(args_cli.input, "r")
     data_group = src["data"]
 
+    # Load manual transition frames if provided
+    manual_map = {}
+    if args_cli.manual:
+        if not os.path.exists(args_cli.manual):
+            raise FileNotFoundError(f"Manual JSON not found: {args_cli.manual}")
+        with open(args_cli.manual, "r") as fh:
+            manual_map = json.load(fh)
+        print(f"[INFO] Loaded manual transitions for {len(manual_map)} episodes")
+
     output_dir = os.path.dirname(args_cli.output) or "."
     os.makedirs(output_dir, exist_ok=True)
     dst = h5py.File(args_cli.output, "w")
@@ -94,7 +117,7 @@ def main():
         eef_quat = torch.tensor(np.array(src_ep["obs/eef_quat"]))    # (T, 4) wxyz
         cube_pos = torch.tensor(np.array(src_ep["obs/cube_pos"]))    # (T, 3)
 
-        # Check for subtask terms
+        # Check for subtask terms (auto-detected from thresholds)
         has_subtasks = "obs/subtask_terms" in src_ep
         if has_subtasks:
             st_group = src_ep["obs/subtask_terms"]
@@ -104,11 +127,35 @@ def main():
             grasp_signal = None
             place_signal = None
 
+        # --- Manual override for subtask transition frames ---
+        if ep_name in manual_map:
+            manual = manual_map[ep_name]
+            n = n_samples
+            if "grasp" in manual:
+                g_frame = int(manual["grasp"])
+                if 0 <= g_frame < n:
+                    new_g = torch.zeros(n, dtype=torch.bool)
+                    new_g[g_frame:] = True
+                    grasp_signal = new_g
+                    print(f"  [MANUAL] grasp → frame {g_frame}")
+                else:
+                    print(f"  [WARN] grasp frame {g_frame} out of range [0, {n})")
+            if "place" in manual:
+                p_frame = int(manual["place"])
+                if 0 <= p_frame < n:
+                    new_p = torch.zeros(n, dtype=torch.bool)
+                    new_p[p_frame:] = True
+                    place_signal = new_p
+                    print(f"  [MANUAL] place → frame {p_frame}")
+                else:
+                    print(f"  [WARN] place frame {p_frame} out of range [0, {n})")
+
         # Fix grasp signal: the original recording triggers grasp when the hand is
         # within 12cm 3D distance, which can fire too early (hand still 8cm below cube).
         # We shift the grasp trigger to the step where the hand is actually closest
         # to the cube, ensuring the grasp subtask includes the full ascending motion.
-        if grasp_signal is not None:
+        # Skip this correction when using manual transition frames.
+        if grasp_signal is not None and ep_name not in manual_map:
             grasp_on = torch.where(grasp_signal > 0)[0]
             if len(grasp_on) > 0:
                 orig_trigger = grasp_on[0].item()
@@ -138,6 +185,19 @@ def main():
         if skip:
             continue
 
+        # --- Trim initial settling steps ---
+        # The first few steps contain large orientation transients from reset
+        # settling that would otherwise appear as nodding in generated data.
+        trim = _TRIM_FRONT
+        eef_pos = eef_pos[trim:]
+        eef_quat = eef_quat[trim:]
+        cube_pos = cube_pos[trim:]
+        if grasp_signal is not None:
+            grasp_signal = grasp_signal[trim:]
+        if place_signal is not None:
+            place_signal = place_signal[trim:]
+        n_samples -= trim
+
         # --- Create annotated episode ---
         dst_ep = dst_data.create_group(ep_name)
         dst_ep.attrs["num_samples"] = n_samples
@@ -146,10 +206,10 @@ def main():
         if "success" in src_ep.attrs:
             dst_ep.attrs["success"] = src_ep.attrs["success"]
 
-        # Copy actions
-        dst_ep.create_dataset("actions", data=np.array(src_ep["actions"]), compression="gzip")
+        # Copy actions (trimmed)
+        dst_ep.create_dataset("actions", data=np.array(src_ep["actions"][trim:]), compression="gzip")
 
-        # Copy observations (flattened)
+        # Copy observations (flattened, trimmed)
         obs_group = dst_ep.create_group("obs")
         for key in src_ep["obs"]:
             if key == "datagen_info":
@@ -158,9 +218,9 @@ def main():
             if isinstance(item, h5py.Group):
                 obs_sub = obs_group.create_group(key)
                 for sk in item:
-                    obs_sub.create_dataset(sk, data=np.array(item[sk]), compression="gzip")
+                    obs_sub.create_dataset(sk, data=np.array(item[sk][trim:]), compression="gzip")
             else:
-                obs_group.create_dataset(key, data=np.array(item), compression="gzip")
+                obs_group.create_dataset(key, data=np.array(item[trim:]), compression="gzip")
 
         # --- Build datagen_info ---
         datagen_group = dst_ep.create_group("obs/datagen_info")

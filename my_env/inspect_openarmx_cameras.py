@@ -32,22 +32,54 @@ def main():
     for prim in stage.Traverse():
         if prim.IsA(UsdGeom.Camera):
             found = True
-            print("Camera:", prim.GetPath(), "Type:", prim.GetTypeName())
+            cam = UsdGeom.Camera(prim)
+            path = prim.GetPath()
+            print(f"\n  Camera: {path}")
+            # Resolution
+            try:
+                res = cam.GetResolutionAttr().Get()
+                print(f"    resolution: {res}")
+            except Exception:
+                print("    resolution: N/A")
+            # Focal length
+            try:
+                fl = cam.GetFocalLengthAttr().Get()
+                print(f"    focal_length: {fl}")
+            except Exception:
+                print("    focal_length: N/A")
+            # Apertures
+            try:
+                ha = cam.GetHorizontalApertureAttr().Get()
+                print(f"    horizontal_aperture: {ha}")
+            except Exception:
+                print("    horizontal_aperture: N/A")
+            try:
+                va = cam.GetVerticalApertureAttr().Get()
+                print(f"    vertical_aperture: {va}")
+            except Exception:
+                print("    vertical_aperture: N/A")
+            # Clipping range
+            try:
+                cr = cam.GetClippingRangeAttr().Get()
+                print(f"    clipping_range: {cr}")
+            except Exception:
+                print("    clipping_range: N/A")
 
     if not found:
         print("No UsdGeom.Camera prim found.")
 
-    print("\n[Possible camera-like prim names]")
+    print("\n[ros2_camera_helper config]")
     for prim in stage.Traverse():
-        name = prim.GetName().lower()
-        if (
-            "cam" in name
-            or "camera" in name
-            or "wrist" in name
-            or "head" in name
-            or "rgb" in name
-        ):
-            print(prim.GetPath(), prim.GetTypeName())
+        if prim.GetTypeName() == "OmniGraphNode" and "ros2_camera_helper" in prim.GetName():
+            print(f"\n  Node: {prim.GetPath()}")
+            # Check all attributes
+            for attr in prim.GetAttributes():
+                try:
+                    val = attr.Get()
+                    if val is not None and str(val) not in ("", "[]", "None"):
+                        print(f"    {attr.GetName()}: {val}")
+                except Exception:
+                    pass
 
     print("\n[Done]")
 

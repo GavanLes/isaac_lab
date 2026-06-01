@@ -345,7 +345,13 @@ def main():
             for i, name in enumerate(dof_names_reset):
                 if name in all_init_joints:
                     init_pos_reset[0, i] = float(all_init_joints[name])
-            _articulation_view.set_dof_positions(init_pos_reset, indices=torch.tensor([0], dtype=torch.int32))
+            idx_tensor = torch.tensor([0], dtype=torch.int32)
+            _articulation_view.set_dof_positions(init_pos_reset, indices=idx_tensor)
+            # Also sync position targets so the PD controller doesn't fight the reset
+            _articulation_view.set_dof_position_targets(init_pos_reset, indices=idx_tensor)
+            # Let PD controller settle
+            for _ in range(30):
+                sim.step()
 
         total_str = f"/{max_episodes}" if max_episodes > 0 else ""
         print(f"\n{'='*60}")
@@ -454,6 +460,19 @@ def main():
                     sim.reset()
                     sim.set_camera_view(eye=CAMERA_EYE, target=CAMERA_TARGET)
                     os.environ["__record_reset"] = "0"
+                    # Re-obtain physics views and sync PD targets after reset
+                    physics_view = SimulationManager.get_physics_sim_view()
+                    _articulation_view = physics_view.create_articulation_view(robot_path)
+                    _cube_view = physics_view.create_rigid_body_view(cube_path)
+                    init_pos = torch.zeros(1, len(dof_names), dtype=torch.float32)
+                    for i, name in enumerate(dof_names):
+                        if name in all_init_joints:
+                            init_pos[0, i] = float(all_init_joints[name])
+                    idx_t = torch.tensor([0], dtype=torch.int32)
+                    _articulation_view.set_dof_positions(init_pos, indices=idx_t)
+                    _articulation_view.set_dof_position_targets(init_pos, indices=idx_t)
+                    for _ in range(30):
+                        sim.step()
                     print("[INFO] Pose reset.")
             elif passive_mode:
                 # Passive: record joint position targets set by Action Graph / ROS2

@@ -1,3 +1,7 @@
 outputs/
 smolvla_output/
 datasets/
+smolvla_output_finger_action/
+smolvla_output_obs/
+smolvla_output_success_half/
+datasets_random/

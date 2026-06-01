@@ -153,9 +153,9 @@ _ROBOT_POS = (-2.083, 0.0, 0.0)
 _CUBE_START_Z = 0.315
 _GRIPPER_HOLD_POS = 0.0
 _ARM_VELOCITY_LIMIT_SIM = 100000.0
-_ARM_EFFORT_LIMIT_SIM = 100000000.0
-_ARM_STIFFNESS = 50000.0
-_ARM_DAMPING = 1000.0
+_ARM_EFFORT_LIMIT_SIM = 1000000000.0
+_ARM_STIFFNESS = 100000.0
+_ARM_DAMPING = 2000.0
 # Path to recording scene USD
 _ENV_USD_PATH = "/home/huatec/isaac_lab/my_env/environment.usd"
 _OPENARMX_USD_PATH = "/home/huatec/isaac_lab/my_env/openarmx.usd"

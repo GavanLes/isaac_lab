@@ -67,13 +67,13 @@ _TRAY_POS = (-1.71578, -0.0800, 0.1797)
 # Robot base position inferred from recording:
 #   cube_init = robot_pos + choose_front_object_position offset (0.35, 0.2, 0.35)
 #   cube_init = [-1.733, 0.200, 0.315]  =>  robot_pos ≈ [-2.083, 0.0, -0.035]
-_ROBOT_POS = (-2.083, 0.0, 0.0)
-_CUBE_START_Z = 0.315
+_ROBOT_POS = (-2.083, 0.0, 0.0253)
+_CUBE_START_Z = 0.20
 _GRIPPER_HOLD_POS = 0.0
 _ARM_VELOCITY_LIMIT_SIM = 100000.0
-_ARM_EFFORT_LIMIT_SIM = 100000000.0
-_ARM_STIFFNESS = 50000.0
-_ARM_DAMPING = 1000.0
+_ARM_EFFORT_LIMIT_SIM = 1000000000.0
+_ARM_STIFFNESS = 100000.0
+_ARM_DAMPING = 2000.0
 # Path to recording scene USD
 _ENV_USD_PATH = "/home/huatec/isaac_lab/my_env/environment.usd"
 _OPENARMX_USD_PATH = "/home/huatec/isaac_lab/my_env/openarmx.usd"
@@ -580,11 +580,11 @@ class OpenArmCubeTrayMimicEnvCfg(OpenArmCubeTrayEnvCfg, MimicEnvCfg):
             prim_path="{ENV_REGEX_NS}/Robot/openarmx_left_hand/left_Camera",
             update_period=0.0,
             height=240,
-            width=240,
+            width=424,
             data_types=["rgb", "distance_to_image_plane"],
             spawn=None,
             offset=CameraCfg.OffsetCfg(
-                pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0), convention="ros"
+                pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0), convention="usd"
             ),
         )
 
@@ -592,11 +592,11 @@ class OpenArmCubeTrayMimicEnvCfg(OpenArmCubeTrayEnvCfg, MimicEnvCfg):
             prim_path="{ENV_REGEX_NS}/Robot/openarmx_right_hand/right_Camera",
             update_period=0.0,
             height=240,
-            width=240,
+            width=424,
             data_types=["rgb", "distance_to_image_plane"],
             spawn=None,
             offset=CameraCfg.OffsetCfg(
-                pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0), convention="ros"
+                pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0), convention="usd"
             ),
         )
 
@@ -604,11 +604,11 @@ class OpenArmCubeTrayMimicEnvCfg(OpenArmCubeTrayEnvCfg, MimicEnvCfg):
             prim_path="{ENV_REGEX_NS}/Robot/openarmx_body_link0/hand_Camera",
             update_period=0.0,
             height=240,
-            width=240,
+            width=424,
             data_types=["rgb", "distance_to_image_plane"],
             spawn=None,
             offset=CameraCfg.OffsetCfg(
-                pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0), convention="ros"
+                pos=(0.0, 0.0, 0.0), rot=(1.0, 0.0, 0.0, 0.0), convention="usd"
             ),
         )
 
@@ -633,14 +633,16 @@ class OpenArmCubeTrayMimicEnvCfg(OpenArmCubeTrayEnvCfg, MimicEnvCfg):
                 object_ref="cube", subtask_term_signal="grasp",
                 selection_strategy="nearest_neighbor_object",
                 subtask_term_offset_range=(0, 5),
-                action_noise=0.0, num_interpolation_steps=8, num_fixed_steps=8,
+                action_noise=0.001, num_interpolation_steps=32, num_fixed_steps=0,
+                apply_noise_during_interpolation=True,
                 description="Approach and grasp the cube",
             ),
             SubTaskConfig(
                 object_ref="tray", subtask_term_signal="place",
                 selection_strategy="nearest_neighbor_object",
                 subtask_term_offset_range=(0, 5),
-                action_noise=0.0, num_interpolation_steps=16, num_fixed_steps=8,
+                action_noise=0.001, num_interpolation_steps=16, num_fixed_steps=0,
+                apply_noise_during_interpolation=True,
                 description="Move cube to tray and release",
             ),
             SubTaskConfig(

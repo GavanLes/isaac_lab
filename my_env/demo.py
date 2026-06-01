@@ -1,5 +1,9 @@
 import argparse
+import random
+import select
 import sys
+import termios
+import tty
 
 from isaaclab.app import AppLauncher
 
@@ -114,12 +118,20 @@ def main():
     print("[INFO] End-effector path:", ee_path, flush=True)
 
     cube_start_pos = choose_front_object_position(robot_pos)
+
+    def random_cube_pos():
+        import random
+        return [
+            robot_pos[0] + 0.35 + random.uniform(-0.01, 0.01),
+            robot_pos[1] + 0.17 + random.uniform(-0.01, 0.01),
+            robot_pos[2] + 0.20,
+        ]
     tray_center = TRAY_CENTER
 
     cube_path = create_dynamic_cube(
         stage,
         CUBE_PATH,
-        pos=cube_start_pos,
+        pos=random_cube_pos(),
         size=CUBE_SIZE,
         height=CUBE_HEIGHT,
         mass=CUBE_MASS,
@@ -156,12 +168,35 @@ def main():
     check_prims(stage, robot_path, cube_path, tray_path)
     print_stage_prims(stage)
 
+    # Non-blocking keyboard input for manual reset
+    _old_settings = termios.tcgetattr(sys.stdin)
+    tty.setcbreak(sys.stdin.fileno())
+
+    def key_pressed():
+        return select.select([sys.stdin], [], [], 0)[0] != []
+
+    def read_key():
+        return sys.stdin.read(1)
+
     reset_cooldown = 0
     while simulation_app.is_running():
         sim.step()
 
         if reset_cooldown > 0:
             reset_cooldown -= 1
+            # Flush keyboard buffer during cooldown (ignore buffered 'R' presses)
+            while key_pressed():
+                read_key()
+            continue
+
+        # Manual reset on 'R' key
+        if key_pressed() and read_key().lower() == "r":
+            sim.reset()
+            new_pos = random_cube_pos()
+            reset_cube(cube_path, new_pos)
+            print(f"[INFO] Manual reset (R key) → cube: ({new_pos[0]:.3f}, {new_pos[1]:.3f}, {new_pos[2]:.3f})")
+            sim.set_camera_view(eye=CAMERA_EYE, target=CAMERA_TARGET)
+            reset_cooldown = RESET_COOLDOWN_STEPS
             continue
 
         if is_cube_in_tray(
@@ -173,11 +208,14 @@ def main():
             TRAY_WALL_HEIGHT,
             ee_path=ee_path,
         ):
-            reset_cube(cube_path, cube_start_pos)
             sim.reset()
+            new_pos = random_cube_pos()
+            reset_cube(cube_path, new_pos)
+            print(f"[INFO] Cube reset to: ({new_pos[0]:.3f}, {new_pos[1]:.3f}, {new_pos[2]:.3f})")
             sim.set_camera_view(eye=CAMERA_EYE, target=CAMERA_TARGET)
             reset_cooldown = RESET_COOLDOWN_STEPS
 
+    termios.tcsetattr(sys.stdin, termios.TCSADRAIN, _old_settings)
     simulation_app.close()
 
 

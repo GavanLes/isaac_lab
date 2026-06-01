@@ -442,8 +442,8 @@ def choose_front_object_position(robot_pos):
     """Place the cube in front of the robot."""
     return [
         robot_pos[0] + 0.35,
-        robot_pos[1] + 0.2,
-        robot_pos[2] + 0.35,
+        robot_pos[1] + 0.17,
+        robot_pos[2] + 0.20,
     ]
 
 
@@ -499,7 +499,7 @@ def reset_cube(cube_path, start_pos):
 
 def set_joint_positions(
     stage, robot_path, joint_positions,
-    arm_stiffness=5000.0, arm_damping=100.0,
+    arm_stiffness=100000.0, arm_damping=2000.0,
     finger_stiffness=50000.0, finger_damping=500.0,
 ):
     """Set initial joint positions on a robot articulation by applying drive APIs.

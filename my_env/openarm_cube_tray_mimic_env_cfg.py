@@ -274,8 +274,8 @@ def _randomize_cube_pose(env, env_ids, asset_cfg: SceneEntityCfg = SceneEntityCf
         ry = robot_pos[idx, 1].item()
         # Match recording's height exactly. Randomizing Z can spawn the cube
         # partially into the table/tray contact shell and corrupt its pose.
-        x = rx + 0.35 + random.uniform(-0.05, 0.05)
-        y = ry + 0.20 + random.uniform(-0.05, 0.05)
+        x = rx + 0.35 + random.uniform(-0.01, 0.01)
+        y = ry + 0.17 + random.uniform(-0.01, 0.01)
         z = _CUBE_START_Z
         pos = torch.tensor([[x, y, z]], device=env.device)
         asset.write_root_pose_to_sim(
@@ -632,16 +632,19 @@ class OpenArmCubeTrayMimicEnvCfg(OpenArmCubeTrayEnvCfg, MimicEnvCfg):
             SubTaskConfig(
                 object_ref="cube", subtask_term_signal="grasp",
                 selection_strategy="nearest_neighbor_object",
+                selection_strategy_kwargs={"nn_k": 3},
                 subtask_term_offset_range=(0, 5),
-                action_noise=0.001, num_interpolation_steps=32, num_fixed_steps=0,
+                first_subtask_start_offset_range=(0, 15),
+                action_noise=0.003, num_interpolation_steps=12, num_fixed_steps=5,
                 apply_noise_during_interpolation=True,
                 description="Approach and grasp the cube",
             ),
             SubTaskConfig(
                 object_ref="tray", subtask_term_signal="place",
                 selection_strategy="nearest_neighbor_object",
-                subtask_term_offset_range=(0, 5),
-                action_noise=0.001, num_interpolation_steps=16, num_fixed_steps=0,
+                selection_strategy_kwargs={"nn_k": 3},
+                subtask_term_offset_range=(5, 15),
+                action_noise=0.001, num_interpolation_steps=10, num_fixed_steps=0,
                 apply_noise_during_interpolation=True,
                 description="Move cube to tray and release",
             ),
@@ -649,7 +652,7 @@ class OpenArmCubeTrayMimicEnvCfg(OpenArmCubeTrayEnvCfg, MimicEnvCfg):
                 object_ref=None, subtask_term_signal=None,
                 selection_strategy="random",
                 subtask_term_offset_range=(0, 0),
-                action_noise=0.0, num_interpolation_steps=3, num_fixed_steps=0,
+                action_noise=0.0001, num_interpolation_steps=5,
                 description="Retreat (final subtask)",
             ),
         ]

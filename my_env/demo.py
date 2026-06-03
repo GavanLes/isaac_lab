@@ -122,8 +122,8 @@ def main():
     def random_cube_pos():
         import random
         return [
-            robot_pos[0] + 0.35 + random.uniform(-0.01, 0.01),
-            robot_pos[1] + 0.17 + random.uniform(-0.01, 0.01),
+            robot_pos[0] + 0.35,
+            robot_pos[1] + 0.17,
             robot_pos[2] + 0.20,
         ]
     tray_center = TRAY_CENTER
